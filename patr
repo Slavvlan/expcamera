@@ -1,0 +1,85 @@
+# ACCESS CONTROLS
+# листы доступа (ACL)
+acl all src all# Имя листа доступа localhost (127.0.0.1)
+acl localhost src 127.0.0.1/32 ::1# подсеть ресурсов localhost
+acl to_localhost dst 127.0.0.0/32 192.168.0.2/32 ::1 192.168.1.2/32# ACL для порта SSL
+acl SSL_ports port 443# Имя листа доступа Safe_ports для безопасных поротв
+acl Safe_ports port 80
+acl Safe_ports port 21 # http
+acl Safe_ports port 443 # ftp
+acl Safe_ports port 70 # https
+acl Safe_ports port 210 # gopher
+acl Safe_ports port 1025–65535 # wais
+acl Safe_ports port 280 # unregistered ports
+acl Safe_ports port 488 # http-mgmt
+acl Safe_ports port 591 # gss-http
+acl Safe_ports port 777 # filemaker
+Имя листа доступа, означающего подсеть (inet_filtered), которой разрешен доступ к Squid
+acl inet_filtered src 192.168.0.3–192.168.0.199/32 192.168.0.220–192.168.0.254/32# Имя листа доступа, обозначающего дрес сервера apache
+acl apache dst 192.168.0.2/32 192.168.1.2/32# Список IP адресов web-ресурсов для блокировки
+acl ip-block dst "/etc/squid3/block/ip-block"# Список доменов web-ресурсов для блокировки
+acl sites-block1 dstdomain "/etc/squid3/block/sites-block1"# Список “технических” доменов web-ресрусов для доступа
+acl tech-sites dstdomain "/etc/squid3/block/tech-sites"# Имя листа доступа, означающего подсеть (inet_limited), которой разрешен доступ к Squid
+# (“ограниченный” интернет и исключительно “технический” интернет)
+acl inet_limited src 192.168.1.3–192.168.1.199/32 192.168.1.220–192.168.1.254/32# Список IP-адресов “технических” веб-ресурсов
+acl tech-ips dst "/etc/squid3/block/tech-ips"# Имя листа доступа manager определяет протокол при доступе к кэшу Squid
+acl manager proto cache_object
+
+# --- Правила ------------------------------------------------------------
+# Доступ к “cachemgr” только с localhost
+http_access allow manager localhost
+# остальным доступ к “cachemgr” запрещен
+http_access deny manager
+# Правило разрешающее доступ для inet_filtered
+http_access allow CONNECT inet_filtered apache Webmin_SSL_port
+# Правило запрещает все порты, кроме указанных в листе доступа Safe_ports
+http_access deny !Safe_ports
+# Правило запрещает все порты для SSL соединения, кроме указанных в листе
+# доступа SSL_ports
+http_access deny CONNECT !SSL_ports
+# Правило запрещает для подсети inet_filtered все IP,
+# перечисленные в файле ip-block
+http_access deny inet_filtered ip-block
+# Правило запрещает для подсети inet_filtered все URL,
+# перечисленные в файле sites-block1
+http_access deny inet_filtered sites-block1
+# Правило разраешает все остальные соединения для inet_filtered,
+# кроме указанных выше
+http_access allow inet_filtered
+# Правило разраешает доступ к URL “технических сайтов” (tech sites)
+# для подсети с ограниченным интернетом (inet_limited)
+http_access allow tech-sites inet_limited
+# Правило разраешает доступ к IP “технических сайтов” (tech sites)
+# для подсети с ограниченным интернетом (inet_limited)
+http_access allow inet_limited tech-ips
+# Правило запрещает все остальные соединения для inet_limited,
+# кроме указанных выше
+http_access deny inet_limited
+# Правило запрещает все остальные соединения для всех
+# внутренних адресов, кроме перечисленных выше
+http_access deny all
+# Адрес прокси без авторизации
+http_port 3128 transparent
+cache_mem 256 MB
+cache_dir ufs /var/spool/squid3 4096 16 256
+maximum_object_size 20480 KB
+# Указаевает, какая программа используется в качестве редиректа
+url_rewrite_program /usr/local/rejik3/redirector /usr/local/rejik3/redirector.conf
+# Используется для определения срока годности обьектов в кэше
+refresh_pattern ^ftp: 1440 20% 10080
+refresh_pattern ^gopher: 1440 0% 1440
+refresh_pattern -i (/cgi-bin/|\?) 0 0% 0
+refresh_pattern . 0 20% 4320
+# Отключаем кэширование apache
+cache deny apache
+# Язык страницы-блокировки, отображающейся при ошибках и блокировании
+# ресрусов
+error_directory /usr/share/squid3/errors/Russian-koi8-r
+# Если Squid уже скачал 60% файла, а пользователь отказался его забирать,
+# то все равно продолжать скачивать файл.
+quick_abort_pct 60
+# Имя пользователя под которым запущен Squid в системе
+#Default:
+# cache_effective_user proxy
+
+
